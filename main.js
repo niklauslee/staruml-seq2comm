@@ -45,32 +45,64 @@ define(function (require, exports, module) {
         CMD_COMM_TO_SEQ     = 'convertDiagram.comm2seq';
 
     /**
-     * Return a connector connecting between the two given lifelines
-     * If no connector, then create one and return.
+     * Return a connector view connecting between the two given lifeline views.
+     * If no connector, then create a connector view and return it.
      *
-     * @param {UMLLifeline} lifeline1
-     * @param {UMLLifeline} lifeline2
-     * @return {UMLConnector}
+     * @param {UMLCommunicationDiagram} dgm
+     * @param {UMLCommLifelineView} lifelineView1
+     * @param {UMLCommLifelineView} lifelineView2
+     * @return {UMLConnectorView}
      */
-    function getConnector(lifeline1, lifeline2) {
-        var role1 = lifeline1.represent,
-            role2 = lifeline2.represent,
+    function getConnectorView(dgm, lifelineView1, lifelineView2) {
+        var role1 = lifelineView1.model.represent,
+            role2 = lifelineView2.model.represent,
             conns = Repository.getRelationshipsOf(role1, function (r) {
                 return (r instanceof type.UMLConnector) &&
                     ((r.end1.reference === role1 && r.end2.reference === role2) || (r.end1.reference === role2 && r.end2.reference === role1));
             });
 
         if (conns.length === 0) {
-            var newConn = Factory.createModel("UMLConnector", role1, "ownedElements", {
-                modelInitializer: function (m) {
-                    m.end1.reference = role1;
-                    m.end2.reference = role2;
-                }
+            var connView = Factory.createModelAndView("UMLConnector", role1, dgm, {
+                x1: lifelineView1.left,
+                y1: lifelineView1.top,
+                x2: lifelineView2.left,
+                y2: lifelineView2.top,
+                tailView: lifelineView1,
+                headView: lifelineView2,
+                tailModel: lifelineView1.model,
+                headModel: lifelineView2.model
             });
-            return newConn;
+            return connView;
         } else {
             return conns[0];
         }
+    }
+
+    /**
+     * Return a lifeline view of a given lifeline contained in the diagram
+     *
+     * @param {UMLLifeline} lifeline1
+     * @param {UMLLifeline} lifeline2
+     * @return {UMLConnector}
+     */
+    function getLifelineView(diagram, lifeline) {
+        var i, len, view;
+        if (diagram instanceof type.UMLSequenceDiagram) {
+            for (i = 0, len = diagram.ownedViews.length; i < len; i++) {
+                view = diagram.ownedViews[i];
+                if (view instanceof type.UMLSeqLifelineView && view.model === lifeline) {
+                    return view;
+                }
+            }
+        } else if (diagram instanceof type.UMLCommunicationDiagram) {
+            for (i = 0, len = diagram.ownedViews.length; i < len; i++) {
+                view = diagram.ownedViews[i];
+                if (view instanceof type.UMLCommLifelineView && view.model === lifeline) {
+                    return view;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -84,28 +116,29 @@ define(function (require, exports, module) {
                 d.name = seq.name;
             }
         });
-
-        // create connectors if absent
-        interaction.messages.forEach(function (m) {
-            if (m instanceof type.UMLMessage) {
-                if (!m.connector) {
-                    var conn = getConnector(m.source, m.target);
-                }
-            }
-        });
+        comm = Repository.get(comm._id);
 
         // create lifelines
-        interaction.participants.forEach(function (p) {
+        interaction.participants.forEach(function (p, idx) {
             if (p instanceof type.UMLLifeline) {
-                Factory.createViewOf(p, comm, { editor: DiagramManager.getEditor() });
+                Factory.createViewOf(p, comm, {
+                    editor: DiagramManager.getEditor(),
+                    x: (idx * 100) + 30,
+                    y: 30
+                });
             }
         });
 
         // create messages
         interaction.messages.forEach(function (m) {
             if (m instanceof type.UMLMessage) {
-                if (!m.connector) {
-                    // create connector
+                if (!m.connector && m.source instanceof type.UMLLifeline && m.target instanceof type.UMLLifeline) {
+                    var lv1 = getLifelineView(comm, m.source),
+                        lv2 = getLifelineView(comm, m.target),
+                        cnv = getConnectorView(comm, lv1, lv2);
+                    Engine.setProperty(m, "connector", cnv.model);
+                    // ...
+                    Factory.createModelAndView()
                 }
             }
         });
@@ -118,15 +151,6 @@ define(function (require, exports, module) {
      * Convert Communication diagram to Sequence diagram
      */
     function convertCommToSeq(comm) {
-
-        var interaction = comm._parent;
-
-        interaction.messages.forEach(function (m) {
-            var cons = getConnector(m.source, m.target);
-            console.log(m, cons);
-        });
-
-
     }
 
     /**
