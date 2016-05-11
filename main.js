@@ -74,7 +74,7 @@ define(function (require, exports, module) {
             });
             return connView;
         } else {
-            return conns[0];
+            return _.find(dgm.ownedViews, function (v) { return v.model === conns[0]; });
         }
     }
 
@@ -137,8 +137,9 @@ define(function (require, exports, module) {
                         lv2 = getLifelineView(comm, m.target),
                         cnv = getConnectorView(comm, lv1, lv2);
                     Engine.setProperty(m, "connector", cnv.model);
+                    // console.log(cnv);
                     // ...
-                    Factory.createModelAndView()
+                    Factory.createViewOf(m, comm);
                 }
             }
         });
