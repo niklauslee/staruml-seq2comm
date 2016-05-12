@@ -27,7 +27,8 @@
 define(function (require, exports, module) {
     "use strict";
 
-    var Repository       = app.getModule("core/Repository"),
+    var Core             = app.getModule("core/Core"),
+        Repository       = app.getModule("core/Repository"),
         Engine           = app.getModule("engine/Engine"),
         SelectionManager = app.getModule("engine/SelectionManager"),
         Factory          = app.getModule("engine/Factory"),
@@ -61,8 +62,9 @@ define(function (require, exports, module) {
                     ((r.end1.reference === role1 && r.end2.reference === role2) || (r.end1.reference === role2 && r.end2.reference === role1));
             });
 
+        var connView = null;
         if (conns.length === 0) {
-            var connView = Factory.createModelAndView("UMLConnector", role1, dgm, {
+            connView = Factory.createModelAndView("UMLConnector", role1, dgm, {
                 x1: lifelineView1.left,
                 y1: lifelineView1.top,
                 x2: lifelineView2.left,
@@ -74,7 +76,11 @@ define(function (require, exports, module) {
             });
             return connView;
         } else {
-            return _.find(dgm.ownedViews, function (v) { return v.model === conns[0]; });
+            connView = _.find(dgm.ownedViews, function (v) { return v.model === conns[0]; });
+            if (!connView) {
+                return Factory.createViewOf(conns[0], dgm);
+            }
+            return connView;
         }
     }
 
@@ -118,6 +124,14 @@ define(function (require, exports, module) {
         });
         comm = Repository.get(comm._id);
 
+        // delete frame
+        var frame = _.find(comm.ownedViews, function (v) {
+            return (v instanceof type.UMLFrameView);
+        });
+        if (frame) {
+            Engine.deleteElements([], [frame]);
+        }
+
         // create lifelines
         interaction.participants.forEach(function (p, idx) {
             if (p instanceof type.UMLLifeline) {
@@ -132,20 +146,40 @@ define(function (require, exports, module) {
         // create messages
         interaction.messages.forEach(function (m) {
             if (m instanceof type.UMLMessage) {
-                if (!m.connector && m.source instanceof type.UMLLifeline && m.target instanceof type.UMLLifeline) {
+                if (m.source instanceof type.UMLLifeline && m.target instanceof type.UMLLifeline) {
                     var lv1 = getLifelineView(comm, m.source),
                         lv2 = getLifelineView(comm, m.target),
                         cnv = getConnectorView(comm, lv1, lv2);
                     Engine.setProperty(m, "connector", cnv.model);
-                    // console.log(cnv);
-                    // ...
-                    Factory.createViewOf(m, comm);
+                    var parasitics = _.filter(comm.ownedViews, function (v) {
+                        return (v.hostEdge === cnv);
+                    });
+                    var mv = Factory.createViewOf(m, comm);
+                    mv = Repository.get(mv._id);
+                    Engine.setProperty(mv, "distance", (20 * parasitics.length) + 10);
                 }
             }
         });
 
         // layout diagram
-        // ...
+        Engine.layoutDiagram(DiagramManager.getEditor(), comm, Core.DIRECTION_LR, { node: 100, edge: 100, rank: 100 }, Core.LS_OBLIQUE);
+        var bound = comm.getBoundingBox(),
+            dx    = (bound.x1 - 30) * -1,
+            dy    = (bound.y1 - 30) * -1;
+        Engine.moveViews(DiagramManager.getEditor(), comm.ownedViews, dx, dy);
+
+        // create frame
+        var newBound = comm.getBoundingBox();
+        Factory.createModelAndView("UMLFrame", null, comm, {
+            viewInitializer: function (v) {
+                v.model = comm;
+                v.left = 10;
+                v.top = 10;
+                v.width = (newBound.x2 - newBound.x1) + 40;
+                v.height = (newBound.y2 - newBound.y1) + 40;
+            }
+        });
+
     }
 
     /**
