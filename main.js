@@ -186,6 +186,64 @@ define(function (require, exports, module) {
      * Convert Communication diagram to Sequence diagram
      */
     function convertCommToSeq(comm) {
+        // create a sequence diagram
+        var interaction = comm._parent,
+            seq = Factory.createDiagram("UMLSequenceDiagram", interaction, {
+            diagramInitializer: function (d) {
+                d.name = comm.name;
+            }
+        });
+        seq = Repository.get(seq._id);
+
+        // delete frame
+        var frame = _.find(seq.ownedViews, function (v) {
+            return (v instanceof type.UMLFrameView);
+        });
+        if (frame) {
+            Engine.deleteElements([], [frame]);
+        }
+
+        // create lifelines
+        var _h = (interaction.messages.length * 35) + 70,
+            _x = 30;
+        interaction.participants.forEach(function (p, idx) {
+            if (p instanceof type.UMLLifeline) {
+                var v = Factory.createViewOf(p, seq, {
+                    editor: DiagramManager.getEditor(),
+                    viewInitializer: function (lv) {
+                        lv.left = _x;
+                        lv.height = _h;
+                    }
+                });
+                _x = v.getRight() + 20;
+            }
+        });
+
+        // create messages
+        var _y = 100;
+        interaction.messages.forEach(function (m) {
+            if (m instanceof type.UMLMessage) {
+                if (m.source instanceof type.UMLLifeline && m.target instanceof type.UMLLifeline) {
+                    var mv = Factory.createViewOf(m, seq, {
+                        editor: DiagramManager.getEditor(),
+                        y: _y
+                    });
+                    _y = _y + 35;
+                }
+            }
+        });
+
+        // create frame
+        var newBound = seq.getBoundingBox();
+        Factory.createModelAndView("UMLFrame", null, seq, {
+            viewInitializer: function (v) {
+                v.model = seq;
+                v.left = 10;
+                v.top = 10;
+                v.width = newBound.x2 + 10;
+                v.height = newBound.y2 + 10;
+            }
+        });
     }
 
     /**
@@ -205,6 +263,8 @@ define(function (require, exports, module) {
                     convertSeqToComm(dgm);
                 }
             });
+        } else {
+            Dialogs.showInfoDialog("Activate or select a Sequence Diagram.");
         }
     }
 
@@ -225,6 +285,8 @@ define(function (require, exports, module) {
                     convertCommToSeq(dgm);
                 }
             });
+        } else {
+            Dialogs.showInfoDialog("Activate or select a Communication Diagram.");
         }
     }
 
