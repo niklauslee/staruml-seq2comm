@@ -291,12 +291,13 @@ define(function (require, exports, module) {
     }
 
     // Register Commands
-    CommandManager.register("Convert Diagram",           CMD_CONVERT_DIAGRAM, CommandManager.doNothing);
-    CommandManager.register("Sequence to Communication", CMD_SEQ_TO_COMM,     _handleSeqToComm);
-    CommandManager.register("Communication to Sequence", CMD_COMM_TO_SEQ,     _handleCommToSeq);
+    CommandManager.register("Convert Diagram",              CMD_CONVERT_DIAGRAM, CommandManager.doNothing);
+    CommandManager.register("Sequence to Communication...", CMD_SEQ_TO_COMM,     _handleSeqToComm);
+    CommandManager.register("Communication to Sequence...", CMD_COMM_TO_SEQ,     _handleCommToSeq);
 
     var menu, menuItem;
-    menu = MenuManager.getMenu(Commands.TOOLS);
+    menu = MenuManager.getMenu(Commands.MODEL);
+    menu.addMenuDivider();
     menuItem = menu.addMenuItem(CMD_CONVERT_DIAGRAM);
     menuItem.addMenuItem(CMD_SEQ_TO_COMM);
     menuItem.addMenuItem(CMD_COMM_TO_SEQ);
